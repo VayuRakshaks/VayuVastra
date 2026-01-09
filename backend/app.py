@@ -1,19 +1,25 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request   # ✅ ADD request
 from flask_cors import CORS
 
+# from services.ward_mapper import get_ward_from_latlng
+from services.app_service import get_aqi_logic
+
 app = Flask(__name__)
-CORS(app)  # ✅ THIS FIXES "Failed to fetch"
+CORS(app)
 
 # -------------------------
 # Mock government sensor data
 # -------------------------
 MOCK_SENSOR_DATA = {
+    "Minto Road (ITO – Civic Centre)": {
+        "station": "ITO / MCD Civic Centre",
+        "pm25": 88
+    },
     "Rohini": {"station": "Rohini Sector 16", "pm25": 72},
     "Dwarka": {"station": "Dwarka Sector 8", "pm25": 55},
     "Anand Vihar": {"station": "Anand Vihar ISBT", "pm25": 96},
     "Lajpat Nagar": {"station": "Lajpat Nagar Central", "pm25": 64},
 }
-
 
 # -------------------------
 # PM2.5 classification
@@ -28,9 +34,6 @@ def classify_pm25(pm25):
     else:
         return "Severe", "Stay indoors. Avoid outdoor exposure."
 
-# -------------------------
-# Root route
-# -------------------------
 @app.route("/")
 def home():
     return jsonify({
@@ -39,34 +42,45 @@ def home():
         "status": "running"
     })
 
-# -------------------------
-# AQI API
-# -------------------------
 @app.route("/api/aqi/<city>/<ward>")
 def get_aqi(city, ward):
-    city_data = MOCK_SENSOR_DATA.get(city)
+    city_data = MOCK_SENSOR_DATA.get(ward)  # ward-based is correct here
 
     if not city_data:
         return jsonify({
-            "city": city,
-            "message": "City data not available"
-        }), 404
+        "city": city,
+        "station": ward,
+        "pm25": 65,
+        "risk_level": "Moderate",
+        "precaution": "Fallback demo data for unsupported ward",
+        "data_source": "Mock Fallback (Demo Mode)"
+    })
 
     pm25 = city_data["pm25"]
     level, advice = classify_pm25(pm25)
 
     return jsonify({
         "city": city,
-        "station": f"{ward} Monitoring Station",
+        "station": city_data["station"],
         "pm25": pm25,
         "risk_level": level,
         "precaution": advice,
         "data_source": "Mock CPCB Sensor (Demo Mode)"
     })
 
-# -------------------------
-# Run app
-# -------------------------
+# @app.route("/api/aqi/location", methods=["POST"])
+# def aqi_from_location():
+#     data = request.json
+#     lat = data.get("lat")
+#     lng = data.get("lng")
+
+#     ward = get_ward_from_latlng(lat, lng)
+#     if not ward:
+#         return jsonify({"error": "Ward not found"}), 404
+
+#     result = get_aqi_logic(ward)
+#     return jsonify(result)
+
 if __name__ == "__main__":
     app.run(debug=True)
 
