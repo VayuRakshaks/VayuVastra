@@ -35,28 +35,72 @@ body {
   }
 }
 @keyframes fadeText {
-  0% { opacity: 0; }
-  15% { opacity: 1; }
-  40% { opacity: 1; }
-  60% { opacity: 0; }
-  100% { opacity: 0; }
-}
-.animated-bg {
-  background: linear-gradient(
-    180deg,
-    #e8f4ff 0%,
-    #f3f9ff 40%,
-    #ffffff 100%
-  );
-  animation: skyFlow 12s ease-in-out infinite alternate;
+  0% {
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  30% {
+    opacity: 1;
+  }
+  40% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
-/* Soft moving sky effect */
+/* 🌤️ Sky Blue Animated Background */
+.animated-bg {
+  background: linear-gradient(
+    -45deg,
+    #e3f2fd,
+    #bbdefb,
+    #e1f5fe,
+    #b3e5fc
+  );
+  background-size: 400% 400%;
+  animation: skyFlow 15s ease infinite;
+}
+
 @keyframes skyFlow {
   0% {
     background-position: 0% 50%;
   }
-  100% {
+  50% {
     background-position: 100% 50%;
   }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+/* 🌱 Eco Awareness Fade Animation */
+@keyframes ecoFade {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  10% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  35% {
+    opacity: 1;
+  }
+  45% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.eco-card {
+  opacity: 0;                     /* 🔑 IMPORTANT */
+  animation: ecoFade 12s infinite;
+  /* animation-fill-mode: both;      🔑 IMPORTANT */
+  will-change: opacity, transform;
 }

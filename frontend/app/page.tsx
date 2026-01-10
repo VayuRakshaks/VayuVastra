@@ -67,6 +67,7 @@ export default function Home() {
 };
 
 
+
   // Default Delhi center
   const [position, setPosition] = useState<[number, number]>([
     28.6139, 77.2090,
@@ -181,7 +182,6 @@ const handleMyLocation = () => {
         return {};
     }
   };
-
   return (
   <>
     {/* 🔝 Navbar */}
@@ -209,13 +209,11 @@ const handleMyLocation = () => {
       >
         <LiveMap position={position} />
       </section>
-
       {locationUsed && (
         <p style={{ fontSize: "0.85rem", color: "#6B7280", marginBottom: "1.5rem" }}>
           Location is used only to fetch air quality insights. No personal data is stored.
         </p>
       )}
-
       {/* 🧭 MAIN GRID */}
       <section
         style={{
@@ -225,6 +223,7 @@ const handleMyLocation = () => {
           alignItems: "stretch",
         }}
       >
+        
         {/* ================= LEFT DASHBOARD ================= */}
         <div>
           {/* 🌫️ AQI SUMMARY */}
@@ -267,32 +266,7 @@ const handleMyLocation = () => {
               </p>
             </div>
           )}
-
-          {/* 🛡️ PRECAUTIONS */}
-          {data && (
-            <div
-              style={{
-                background: "#ffffff",
-                padding: "1.6rem",
-                borderRadius: "14px",
-                border: "1px solid #E5E7EB",
-                marginBottom: "1.6rem",
-              }}
-            >
-              <h3>Recommended Actions</h3>
-              <p style={{ fontSize: "0.9rem", color: "#6B7280" }}>
-                For <b>{ward}</b> based on current air quality
-              </p>
-
-              <ul>
-                {getPrecautions(data.risk_level).map((item, index) => (
-                  <li key={index}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* 🏙️ CITY SELECT */}
+ {/* 🏙️ CITY SELECT */}
           <div
             style={{
               background: "#ffffff",
@@ -337,75 +311,245 @@ const handleMyLocation = () => {
               ))}
             </select>
           </div>
+          {/* 🛡️ PRECAUTIONS */}
+          {data && (
+            <div
+              style={{
+                background: "#ffffff",
+                padding: "1.6rem",
+                borderRadius: "14px",
+                border: "1px solid #E5E7EB",
+                marginBottom: "1.6rem",
+              }}
+            >
+              <h3>Recommended Actions</h3>
+              <p style={{ fontSize: "0.9rem", color: "#6B7280" }}>
+                For <b>{ward}</b> based on current air quality
+              </p>
+
+              <ul>
+                {getPrecautions(data.risk_level).map((item, index) => (
+                  <li key={index}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {data && (data.risk_level === "Poor" || data.risk_level === "Severe") && (
+  <section
+    style={{
+      background: "#FFF5F5",
+      padding: "1.6rem",
+      borderRadius: "14px",
+      border: "1px solid #FCA5A5",
+      maxWidth: "520px",
+      marginBottom: "2rem",
+    }}
+  >
+    <h3 style={{ marginBottom: "0.6rem", color: "#7F1D1D" }}>
+      🚨 Report Local Pollution Issue
+    </h3>
+
+    <p style={{ fontSize: "0.9rem", color: "#7F1D1D", marginBottom: "1rem" }}>
+      Witnessing garbage burning, fire, or excessive smoke in your area?  
+      Report it to the Pollution Control Authority.
+    </p>
+
+    <form
+      action="mailto:complaints@dpcc.delhi.gov.in"
+      method="post"
+      encType="multipart/form-data"
+    >
+      <textarea
+        placeholder="Describe the issue (location, time, cause)..."
+        required
+        style={{
+          width: "100%",
+          padding: "0.6rem",
+          borderRadius: "8px",
+          border: "1px solid #FCA5A5",
+          marginBottom: "0.8rem",
+        }}
+      />
+
+      <input
+        type="file"
+        accept="image/*,video/*"
+        style={{ marginBottom: "0.8rem" }}
+      />
+
+      <button
+        type="submit"
+        style={{
+          padding: "0.6rem 1.2rem",
+          background: "#B91C1C",
+          color: "#ffffff",
+          border: "none",
+          borderRadius: "8px",
+          cursor: "pointer",
+        }}
+      >
+        Submit Complaint
+      </button>
+    </form>
+
+    <p style={{ fontSize: "0.75rem", marginTop: "0.6rem", color: "#7F1D1D" }}>
+      Complaints are sent via email. No personal data is stored.
+    </p>
+  </section>
+)}
+
+
+         
         </div>
 
         {/* ================= RIGHT ECO PANEL ================= */}
-        <div
-          style={{
-            background: "#ffffff",
-            borderRadius: "16px",
-            border: "1px solid #E5E7EB",
-            padding: "1.2rem",
-            display: "flex",
-            flexDirection: "column",
-            gap: "1rem",
-          }}
-        >
-          {/* 🌱 GIF */}
-          <div
-            style={{
-              borderRadius: "12px",
-              overflow: "hidden",
-              border: "1px solid #E5E7EB",
-            }}
-          >
-            <img
-              src="/growth.gif"
-              alt="Plant growth"
-              style={{ width: "100%", height: "200px", objectFit: "cover" }}
-            />
-          </div>
+<div
+  style={{
+    background: "#ffffff",
+    borderRadius: "16px",
+    border: "1px solid #E5E7EB",
+    padding: "1.2rem",
+    display: "flex",
+    flexDirection: "column",
+    gap: "1rem",
+  }}
+>
+  {/* 🌱 PLANT GROWTH GIF */}
+  <div
+    style={{
+      borderRadius: "12px",
+      overflow: "hidden",
+      border: "1px solid #E5E7EB",
+    }}
+  >
+    <img
+      src="/growth.gif"
+      alt="Plant growth"
+      style={{
+        width: "100%",
+        height: "200px",
+        objectFit: "cover",
+      }}
+    />
+  </div>
 
-          {/* 🌿 TESTIMONIALS */}
-          <div
-            style={{
-              background: "#F9FAFB",
-              borderRadius: "12px",
-              padding: "1rem",
-              fontSize: "0.95rem",
-              animation: "fadeText 6s infinite",
-            }}
-          >
-            🌳 <b>Trees reduce PM2.5</b><br />
-            Urban trees can reduce air pollution by up to <b>30%</b>.
-          </div>
+  {/* 🌿 AWARENESS / TESTIMONIAL */}
+  <div
+    className="eco-quote"
+    style={{
+      background: "#ECFEF3",
+      borderRadius: "12px",
+      padding: "1rem",
+      fontSize: "0.95rem",
+      minHeight: "90px",
+      display: "flex",
+      alignItems: "center",
+      animation: "fadeText 9s infinite",
+    }}
+  >
+    🌳 <b>Trees reduce PM2.5</b><br />
+    Urban trees can reduce air pollution by up to <b>30%</b>.
+    
+  </div>
+ <div
+  style={{
+    position: "relative",
+    height: "110px",
+    overflow: "hidden",
+  }}
+>
+  {/* 🌡️ Natural Cooling */}
+  <div
+    className="eco-card"
+    style={{
+      background: "#ECFEF3",
+      color: "#064e3b",
+      borderRadius: "12px",
+      padding: "1.25rem",
+      fontSize: "0.95rem",
+      border: "1px solid #A7F3D0",
+      position: "absolute",
+      width: "100%",
+      animationDelay: "0s",
+    }}
+  >
+    <b>🌡️ Natural Cooling</b>
+    <div>Shading can lower street temperatures by <b>8°C</b>.</div>
+  </div>
 
-          <div
-            style={{
-              background: "#F9FAFB",
-              borderRadius: "12px",
-              padding: "1rem",
-              fontSize: "0.95rem",
-              animation: "fadeText 6s infinite 2s",
-            }}
-          >
-            🌿 <b>Green cover improves health</b><br />
-            Areas with trees see fewer respiratory issues.
-          </div>
+  {/* 🔋 Energy Saver */}
+  <div
+    className="eco-card"
+    style={{
+      background: "#ECFEF3",
+      color: "#064e3b",
+      borderRadius: "12px",
+      padding: "1.25rem",
+      fontSize: "0.95rem",
+      border: "1px solid #A7F3D0",
+      position: "absolute",
+      width: "100%",
+      animationDelay: "3s",
+    }}
+  >
+    <b>🔋 Energy Saver</b>
+    <div>Trees reduce AC usage by <b>30%</b>.</div>
+  </div>
 
-          <div
-            style={{
-              background: "#F9FAFB",
-              borderRadius: "12px",
-              padding: "1rem",
-              fontSize: "0.95rem",
-              animation: "fadeText 6s infinite 4s",
-            }}
-          >
-            🌱 <b>Planting today saves tomorrow</b><br />
-            Even one tree offsets ~20kg CO₂ per year.
-          </div>
-        </div>
+  {/* 💧 Flood Defense */}
+  <div
+    className="eco-card"
+    style={{
+      background: "#ECFEF3",
+      color: "#064e3b",
+      borderRadius: "12px",
+      padding: "1.25rem",
+      fontSize: "0.95rem",
+      border: "1px solid #A7F3D0",
+      position: "absolute",
+      width: "100%",
+      animationDelay: "6s",
+    }}
+  >
+    <b>💧 Flood Defense</b>
+    <div>One tree absorbs <b>15,000L</b> rain/year.</div>
+  </div>
+
+  {/* 🔇 Noise Buffer */}
+  <div
+    className="eco-card"
+    style={{
+      background: "#ECFEF3",
+      color: "#064e3b",
+      borderRadius: "12px",
+      padding: "1.25rem",
+      fontSize: "0.95rem",
+      border: "1px solid #A7F3D0",
+      position: "absolute",
+      width: "100%",
+      animationDelay: "9s",
+    }}
+  >
+    <b>🔇 Noise Buffer</b>
+    <div>Green buffers reduce noise by <b>10 dB</b>.</div>
+  </div>
+</div>
+
+  {/* 🌍 CTA */}
+  <div
+    style={{
+      background: "#F0F9FF",
+      borderRadius: "12px",
+      padding: "0.9rem",
+      fontSize: "0.9rem",
+      color: "#065F46",
+    }}
+  >
+    💡 <b>Did you know?</b><br />
+    Planting trees & reporting pollution can significantly improve local air quality.
+  </div>
+  
+</div>
         {showEmergency && (
   <div
     style={{
@@ -463,10 +607,8 @@ const handleMyLocation = () => {
     </div>
   </div>
 )}
-
       </section>
     </main>
   </>
 );
-
 }
