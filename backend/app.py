@@ -1,11 +1,19 @@
-from flask import Flask, jsonify, request   # ✅ ADD request
+from flask import Flask, jsonify, request
 from flask_cors import CORS
+import json
+import os
 
-# from services.ward_mapper import get_ward_from_latlng
-from services.app_service import get_aqi_logic
-
+# -------------------------
+# CREATE APP (ONCE)
+# -------------------------
 app = Flask(__name__)
 CORS(app)
+
+# -------------------------
+# REGISTER BLUEPRINTS
+# -------------------------
+from services.auth import auth_bp
+app.register_blueprint(auth_bp, url_prefix="/api/auth")
 
 # -------------------------
 # Mock government sensor data
@@ -22,6 +30,20 @@ MOCK_SENSOR_DATA = {
 }
 
 # -------------------------
+# Helpers
+# -------------------------
+def normalize_name(name):
+    return (
+        name.lower()
+        .replace("–", "-")
+        .replace("—", "-")
+        .replace("(", "")
+        .replace(")", "")
+        .replace("/", "")
+        .strip()
+    )
+
+# -------------------------
 # PM2.5 classification
 # -------------------------
 def classify_pm25(pm25):
@@ -34,6 +56,9 @@ def classify_pm25(pm25):
     else:
         return "Severe", "Stay indoors. Avoid outdoor exposure."
 
+# -------------------------
+# Root route
+# -------------------------
 @app.route("/")
 def home():
     return jsonify({
@@ -42,147 +67,93 @@ def home():
         "status": "running"
     })
 
+# =====================================================
+# GOVERNMENT DASHBOARD APIS
+# =====================================================
+
+@app.route("/api/wards")
+def get_all_wards():
+    wards = []
+
+    for ward, data in MOCK_SENSOR_DATA.items():
+        pm25 = data["pm25"]
+        level, _ = classify_pm25(pm25)
+
+        wards.append({
+            "ward": ward,
+            "station": data["station"],
+            "pm25": pm25,
+            "risk_level": level
+        })
+
+    return jsonify(wards)
+
+@app.route("/api/wards/high-risk")
+def get_high_risk_wards():
+    high_risk = []
+
+    for ward, data in MOCK_SENSOR_DATA.items():
+        pm25 = data["pm25"]
+        level, _ = classify_pm25(pm25)
+
+        if level in ["Poor", "Severe"]:
+            high_risk.append({
+                "ward": ward,
+                "station": data["station"],
+                "pm25": pm25,
+                "risk_level": level
+            })
+
+    return jsonify(high_risk)
+
+@app.route("/api/wards/geojson")
+def get_ward_geojson():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    geojson_path = os.path.join(base_dir, "data", "ward.geojson")
+
+    if not os.path.exists(geojson_path):
+        return jsonify({
+            "type": "FeatureCollection",
+            "features": []
+        })
+
+    with open(geojson_path, "r", encoding="utf-8") as f:
+        geojson_data = json.load(f)
+
+    return jsonify(geojson_data)
+
+# =====================================================
+# CITIZEN / WARD DETAIL API
+# =====================================================
 @app.route("/api/aqi/<city>/<ward>")
 def get_aqi(city, ward):
-    city_data = MOCK_SENSOR_DATA.get(ward)  # ward-based is correct here
+    ward = normalize_name(ward)
 
-    if not city_data:
-        return jsonify({
-        "city": city,
-        "station": ward,
-        "pm25": 65,
-        "risk_level": "Moderate",
-        "precaution": "Fallback demo data for unsupported ward",
-        "data_source": "Mock Fallback (Demo Mode)"
-    })
+    for key, data in MOCK_SENSOR_DATA.items():
+        if normalize_name(key) == ward:
+            pm25 = data["pm25"]
+            level, advice = classify_pm25(pm25)
 
-    pm25 = city_data["pm25"]
-    level, advice = classify_pm25(pm25)
+            return jsonify({
+                "city": city,
+                "station": data["station"],
+                "pm25": pm25,
+                "risk_level": level,
+                "precaution": advice,
+                "data_source": "Mock CPCB Sensor (Demo Mode)"
+            })
 
     return jsonify({
         "city": city,
-        "station": city_data["station"],
-        "pm25": pm25,
-        "risk_level": level,
-        "precaution": advice,
-        "data_source": "Mock CPCB Sensor (Demo Mode)"
+        "station": ward,
+        "pm25": 55,
+        "risk_level": "Moderate",
+        "precaution": "Fallback demo data",
+        "data_source": "Mock Fallback"
     })
 
-# @app.route("/api/aqi/location", methods=["POST"])
-# def aqi_from_location():
-#     data = request.json
-#     lat = data.get("lat")
-#     lng = data.get("lng")
-
-#     ward = get_ward_from_latlng(lat, lng)
-#     if not ward:
-#         return jsonify({"error": "Ward not found"}), 404
-
-#     result = get_aqi_logic(ward)
-#     return jsonify(result)
-
+# -------------------------
+# Run app
+# -------------------------
 if __name__ == "__main__":
-    app.run(debug=True)
-
-
-# if we use AQICN
-# from flask import Flask, jsonify
-# import requests
-
-# app = Flask(__name__)
-
-# # =========================
-# # CONFIG
-# # =========================
-# AQICN_TOKEN = "YOUR_AQICN_TOKEN_HERE"
-
-# # Mock CPCB-style fallback data
-# MOCK_SENSOR_DATA = {
-#     "Delhi": {"station": "Anand Vihar", "pm25": 86},
-#     "Mumbai": {"station": "Bandra", "pm25": 42},
-#     "Kolkata": {"station": "Salt Lake", "pm25": 58},
-# }
-
-# # =========================
-# # PM2.5 Classification
-# # =========================
-# def classify_pm25(pm25):
-#     if pm25 <= 30:
-#         return "Good", "Air quality is good. Normal outdoor activities are safe."
-#     elif pm25 <= 60:
-#         return "Moderate", "Sensitive people should reduce prolonged outdoor activity."
-#     elif pm25 <= 90:
-#         return "Poor", "Avoid outdoor exercise. Wear masks if stepping out."
-#     else:
-#         return "Severe", "Stay indoors. Avoid outdoor exposure."
-
-# # =========================
-# # Root route
-# # =========================
-# @app.route("/")
-# def home():
-#     return jsonify({
-#         "service": "VayuVastra Backend",
-#         "mode": "AQICN + Mock Fallback",
-#         "status": "running"
-#     })
-
-# # =========================
-# # AQI API
-# # =========================
-# @app.route("/api/aqi/<city>")
-# def get_aqi(city):
-#     # -------------------------
-#     # 1️⃣ Try AQICN (LIVE)
-#     # -------------------------
-#     try:
-#         url = f"https://api.waqi.info/feed/{city}/?token={AQICN_TOKEN}"
-#         res = requests.get(url, timeout=10).json()
-
-#         if res.get("status") == "ok":
-#             data = res.get("data", {})
-#             pm25 = data.get("iaqi", {}).get("pm25", {}).get("v")
-
-#             if pm25 is not None:
-#                 level, advice = classify_pm25(pm25)
-#                 return jsonify({
-#                     "city": city,
-#                     "station": data.get("city", {}).get("name"),
-#                     "pm25": pm25,
-#                     "risk_level": level,
-#                     "precaution": advice,
-#                     "data_source": "AQICN (Live Public Data)"
-#                 })
-#     except Exception:
-#         pass
-
-#     # -------------------------
-#     # 2️⃣ Fallback: Mock CPCB
-#     # -------------------------
-#     fallback = MOCK_SENSOR_DATA.get(city)
-
-#     if fallback:
-#         pm25 = fallback["pm25"]
-#         level, advice = classify_pm25(pm25)
-#         return jsonify({
-#             "city": city,
-#             "station": fallback["station"],
-#             "pm25": pm25,
-#             "risk_level": level,
-#             "precaution": advice,
-#             "data_source": "Mock CPCB Sensor (Demo Fallback)"
-#         })
-
-#     # -------------------------
-#     # 3️⃣ No data available
-#     # -------------------------
-#     return jsonify({
-#         "city": city,
-#         "message": "No air quality data available"
-#     }), 404
-
-# # =========================
-# # Run app
-# # =========================
-# if __name__ == "__main__":
-#     app.run(debug=True)
+    app.run(debug=True, use_reloader=False)
