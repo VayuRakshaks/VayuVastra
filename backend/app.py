@@ -4,6 +4,12 @@ import json
 import os
 
 # -------------------------
+# In-memory complaint store (demo)
+# -------------------------
+COMPLAINTS = []
+
+
+# -------------------------
 # CREATE APP (ONCE)
 # -------------------------
 app = Flask(__name__)
@@ -27,6 +33,25 @@ MOCK_SENSOR_DATA = {
     "Dwarka": {"station": "Dwarka Sector 8", "pm25": 55},
     "Anand Vihar": {"station": "Anand Vihar ISBT", "pm25": 96},
     "Lajpat Nagar": {"station": "Lajpat Nagar Central", "pm25": 64},
+}
+
+# Add below MOCK_SENSOR_DATA
+
+MOCK_AQI_TIMESERIES = {
+    "Rohini": [
+        {"time": "10:00", "pm25": 68},
+        {"time": "11:00", "pm25": 70},
+        {"time": "12:00", "pm25": 72},
+        {"time": "13:00", "pm25": 75},
+        {"time": "14:00", "pm25": 73},
+    ],
+    "Minto Road (ITO – Civic Centre)": [
+        {"time": "10:00", "pm25": 80},
+        {"time": "11:00", "pm25": 85},
+        {"time": "12:00", "pm25": 88},
+        {"time": "13:00", "pm25": 90},
+        {"time": "14:00", "pm25": 92},
+    ]
 }
 
 # -------------------------
@@ -151,6 +176,116 @@ def get_aqi(city, ward):
         "precaution": "Fallback demo data",
         "data_source": "Mock Fallback"
     })
+@app.route("/api/aqi/history/<ward>")
+def get_aqi_history(ward):
+    ward = normalize_name(ward)
+
+    for key, history in MOCK_AQI_TIMESERIES.items():
+        if normalize_name(key) == ward:
+            return jsonify(history)
+
+    return jsonify([])
+
+
+# -------------------------
+# Mock complaints storage
+# -------------------------
+COMPLAINTS = []
+
+@app.route("/api/complaints", methods=["POST"])
+def submit_complaint():
+    data = request.json
+
+    required_fields = ["city", "ward", "issue"]
+    if not all(field in data for field in required_fields):
+        return jsonify({"error": "Missing required fields"}), 400
+
+    complaint = {
+        "id": len(COMPLAINTS) + 1,
+        "city": data["city"],
+        "ward": data["ward"],
+        "issue": data["issue"],
+        "timestamp": data.get("timestamp"),
+        "status": "Pending"
+    }
+
+    COMPLAINTS.append(complaint)
+
+    return jsonify({
+        "message": "Complaint submitted successfully",
+        "complaint_id": complaint["id"]
+    }), 201
+
+
+# =====================================================
+# 🛑 COMPLAINTS (IN-MEMORY)
+# =====================================================
+
+complaints = []
+
+@app.route("/api/complaints", methods=["POST"])
+def submit_complaint():
+    data = request.json
+
+    complaint = {
+        "city": data.get("city"),
+        "ward": data.get("ward"),
+        "message": data.get("message"),
+        "timestamp": data.get("timestamp"),
+        "status": "Pending"
+    }
+
+    complaints.append(complaint)
+
+    return jsonify({
+        "success": True,
+        "message": "Complaint registered successfully"
+    }), 201
+
+
+@app.route("/api/complaints", methods=["GET"])
+def get_complaints():
+    return jsonify(complaints)
+
+from datetime import datetime
+
+@app.route("/api/complaints", methods=["POST"])
+def submit_complaint():
+    data = request.json
+
+    if not data:
+        return jsonify({"error": "Invalid data"}), 400
+
+    complaint = {
+        "id": len(COMPLAINTS) + 1,
+        "city": data.get("city"),
+        "ward": data.get("ward"),
+        "message": data.get("message"),
+        "time": datetime.now().isoformat(),
+        "status": "Open"
+    }
+
+    COMPLAINTS.append(complaint)
+
+    return jsonify({
+        "success": True,
+        "complaint": complaint
+    }), 201
+
+@app.route("/api/complaints", methods=["GET"])
+def get_complaints():
+    ward = request.args.get("ward")
+
+    if ward:
+        filtered = [
+            c for c in COMPLAINTS
+            if c["ward"].lower() == ward.lower()
+        ]
+        return jsonify(filtered)
+
+    return jsonify(COMPLAINTS)
+
+
 
 # -------------------------
 # Run app

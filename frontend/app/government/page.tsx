@@ -62,6 +62,14 @@ export default function GovernmentDashboard() {
               Ward-wise PM2.5 monitoring & risk assessment
             </p>
           </header>
+       
+      <div className="mt-4 flex gap-4">
+
+</div>
+
+
+
+
 
           {loading && (
             <p className="mt-6 text-gray-600 text-lg">
@@ -166,6 +174,17 @@ export default function GovernmentDashboard() {
                   </ul>
                 </div>
               </section>
+              <a
+  href="/government/complaints"
+  className="block bg-white border rounded-xl p-6 shadow hover:shadow-lg transition"
+>
+  <h3 className="text-lg font-semibold text-red-600">
+    🚨 Complaints Management
+  </h3>
+  <p className="text-sm text-gray-600 mt-1">
+    View and filter ward-wise pollution complaints
+  </p>
+</a>
 
               {/* MAP */}
               <section className="mt-14 bg-white border rounded-2xl shadow p-6">
