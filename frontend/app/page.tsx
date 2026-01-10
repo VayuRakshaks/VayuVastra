@@ -355,11 +355,11 @@ const handleMyLocation = () => {
     </p>
 
     <form
-      action="mailto:complaints@dpcc.delhi.gov.in"
+      action="mailto:aryanvinaypandey20@gmail.com"
       method="post"
       encType="multipart/form-data"
     >
-      <textarea
+      {/* <textarea
         placeholder="Describe the issue (location, time, cause)..."
         required
         style={{
@@ -369,13 +369,9 @@ const handleMyLocation = () => {
           border: "1px solid #FCA5A5",
           marginBottom: "0.8rem",
         }}
-      />
+      /> */}
 
-      <input
-        type="file"
-        accept="image/*,video/*"
-        style={{ marginBottom: "0.8rem" }}
-      />
+       
 
       <button
         type="submit"
