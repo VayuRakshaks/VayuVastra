@@ -46,7 +46,7 @@ const filteredComplaints =
 
   return (
     <>
-      <Navbar />
+      <Navbar/>
 
       <main className="min-h-screen bg-gray-50 px-6 py-10">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -69,7 +69,7 @@ const filteredComplaints =
   <select
     value={selectedWard}
     onChange={(e) => setSelectedWard(e.target.value)}
-    className="border rounded px-3 text-grey-700 py-1"
+    className="border text-black rounded px-3 text-grey-700 py-1"
   >
     {wards.map((w) => (
       <option key={w} value={w}>

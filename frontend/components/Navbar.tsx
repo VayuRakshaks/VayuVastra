@@ -54,18 +54,6 @@ export default function Navbar({
             scrolled ? "text-gray-800" : "text-white"
           }`}
         >
-          <a href="#about" className="hover:opacity-80">
-            About
-          </a>
-          <a href="#dashboards" className="hover:opacity-80">
-            Dashboards
-          </a>
-          <a href="#tech" className="hover:opacity-80">
-            Technology
-          </a>
-          <a href="#contact" className="hover:opacity-80">
-            Contact
-          </a>
         </div>
 
         {/* Actions */}
