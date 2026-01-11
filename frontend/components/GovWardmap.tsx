@@ -1,114 +1,91 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import "leaflet/dist/leaflet.css";
 import { useEffect, useState } from "react";
+import "leaflet/dist/leaflet.css";
+const GeoJSON = dynamic(
+  () => import("react-leaflet").then((m) => m.GeoJSON),
+  { ssr: false }
+);
 
-// Dynamically import Leaflet components (SSR disabled)
+
+/* ================= LEAFLET (SSR OFF) ================= */
 const MapContainer = dynamic(
-  () => import("react-leaflet").then((mod) => mod.MapContainer),
+  () => import("react-leaflet").then((m) => m.MapContainer),
   { ssr: false }
 );
 const TileLayer = dynamic(
-  () => import("react-leaflet").then((mod) => mod.TileLayer),
+  () => import("react-leaflet").then((m) => m.TileLayer),
   { ssr: false }
 );
-const GeoJSON = dynamic(
-  () => import("react-leaflet").then((mod) => mod.GeoJSON),
+const Circle = dynamic(
+  () => import("react-leaflet").then((m) => m.Circle),
+  { ssr: false }
+);
+const Popup = dynamic(
+  () => import("react-leaflet").then((m) => m.Popup),
   { ssr: false }
 );
 
+/* ================= TYPES ================= */
 type WardAQI = {
   ward: string;
   pm25: number;
-  risk_level: string;
+  risk_level: "Good" | "Moderate" | "Poor" | "Severe";
 };
 
-export default function GovWardMap() {
-  const [geoData, setGeoData] = useState<any>(null);
-  const [aqiData, setAqiData] = useState<WardAQI[]>([]);
+/* ================= WARD CENTROIDS ================= */
+/* Approximate by design — intentional for demo */
+const WARD_POINTS: Record<string, [number, number]> = {
+  "Rohini": [28.713, 77.105],
+  "Karol Bagh": [28.651, 77.189],
+  "Minto Road (ITO – Civic Centre)": [28.628, 77.241],
+  "Anand Vihar": [28.648, 77.315],
+  "Dwarka": [28.592, 77.045],
+  "Lajpat Nagar": [28.567, 77.243],
+};
+
+/* ================= VISUAL RULES ================= */
+const RISK_COLOR: Record<WardAQI["risk_level"], string> = {
+  Good: "#22c55e",
+  Moderate: "#eab308",
+  Poor: "#f97316",
+  Severe: "#dc2626",
+};
+
+
+
+const radiusFromPM25 = (pm25: number) => {
+  // meters
+  return Math.min(3500, Math.max(600, pm25 * 35));
+};
+
+/* ================= COMPONENT ================= */
+export default function GovWardMarkers() {
+  const [wards, setWards] = useState<WardAQI[]>([]);
   const [showHighRiskOnly, setShowHighRiskOnly] = useState(false);
 
-  // Fetch GeoJSON
-  useEffect(() => {
-    fetch("http://localhost:5000/api/wards/geojson")
-      .then((res) => res.json())
-      .then((data) => setGeoData(data));
-  }, []);
+  const [boundary, setBoundary] = useState<any>(null);
 
-  // Fetch AQI data
+useEffect(() => {
+  fetch("/data/delhi-boundary.geojson")
+    .then((res) => res.json())
+    .then(setBoundary)
+    .catch(console.error);
+}, []);
+
+  /* ================= FETCH AQI DATA ================= */
   useEffect(() => {
     fetch("http://localhost:5000/api/wards")
       .then((res) => res.json())
-      .then((data) => setAqiData(data));
+      .then(setWards)
+      .catch(console.error);
   }, []);
 
-  const getColor = (pm25: number) => {
-    if (pm25 <= 30) return "green";
-    if (pm25 <= 60) return "yellow";
-    if (pm25 <= 90) return "orange";
-    return "red";
-  };
-
-const styleFeature = (feature: any) => {
-  const wardName = feature.properties?.ward;
-
-  const wardAQI = aqiData.find(
-    (w) => w.ward.toLowerCase() === wardName?.toLowerCase()
-  );
-
-  // 🔴 TOGGLE ON: show ONLY Poor & Severe
-  if (showHighRiskOnly) {
-    if (!wardAQI) {
-      // no AQI data → hide
-      return { fillOpacity: 0, weight: 0 };
-    }
-
-    if (wardAQI.risk_level !== "Poor" && wardAQI.risk_level !== "Severe") {
-      // Good / Moderate → hide
-      return { fillOpacity: 0, weight: 0 };
-    }
-  }
-
-  const pm25 = wardAQI?.pm25 ?? 0;
-
-  return {
-    fillColor: getColor(pm25),
-    color: "black",
-    weight: 1,
-    fillOpacity: 0.6,
-  };
-};
-
-
-  const onEachFeature = (feature: any, layer: any) => {
-    const wardName = feature.properties?.ward;
-
-    const wardAQI = aqiData.find(
-      (w) => w.ward.toLowerCase() === wardName?.toLowerCase()
-    );
-
-    if (wardAQI) {
-      layer.bindTooltip(
-        `<strong>${wardAQI.ward}</strong><br/>
-         PM2.5: ${wardAQI.pm25}<br/>
-         Risk: ${wardAQI.risk_level}<br/>
-         <em>Click for details</em>`,
-        { sticky: true }
-      );
-
-      layer.on("click", () => {
-        window.location.href = `/government/ward/${encodeURIComponent(
-          wardAQI.ward
-        )}`;
-      });
-    }
-  };
-
   return (
-    <div style={{ marginTop: "20px" }}>
-      {/* ✅ TOGGLE */}
-      <label style={{ display: "block", marginBottom: "10px" }}>
+    <div>
+      {/* TOGGLE */}
+      <label className="block mb-3 text-sm">
         <input
           type="checkbox"
           checked={showHighRiskOnly}
@@ -117,7 +94,7 @@ const styleFeature = (feature: any) => {
         Show only high-risk wards
       </label>
 
-      {/* ✅ MAP */}
+      {/* MAP */}
       <div style={{ height: "500px", position: "relative" }}>
         <MapContainer
           center={[28.6139, 77.209]}
@@ -125,37 +102,88 @@ const styleFeature = (feature: any) => {
           style={{ height: "100%", width: "100%" }}
         >
           <TileLayer
-            attribution="© OpenStreetMap"
+            attribution="© OpenStreetMap contributors"
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
-          {geoData && (
-            <GeoJSON
-              data={geoData}
-              style={styleFeature}
-              onEachFeature={onEachFeature}
-            />
-          )}
+          {/* DELHI CITY BOUNDARY (CONTEXT ONLY) */}
+{boundary && (
+  <GeoJSON
+    data={boundary}
+    style={{
+      color: "#2563eb",       // soft blue border
+      weight: 2,
+      fillOpacity: 0.05,      // very light fill
+    }}
+    interactive={false}      // 🚫 NOT clickable
+  />
+)}
+
+
+          {/* ================= SEVERITY RINGS ================= */}
+          {wards.map((w) => {
+            const coords = WARD_POINTS[w.ward];
+            if (!coords) return null;
+
+            if (
+              showHighRiskOnly &&
+              w.risk_level !== "Poor" &&
+              w.risk_level !== "Severe"
+            ) {
+              return null;
+            }
+
+            return (
+              <Circle
+                key={w.ward}
+                center={coords}
+                radius={radiusFromPM25(w.pm25)}
+                pathOptions={{
+                  color: RISK_COLOR[w.risk_level],
+                  fillColor: RISK_COLOR[w.risk_level],
+                  fillOpacity: 0.35,
+                }}
+                eventHandlers={{
+                  click: () => {
+                    window.location.href = `/government/ward/${encodeURIComponent(
+                      w.ward
+                    )}`;
+                  },
+                }}
+              >
+                <Popup>
+                  <strong>{w.ward}</strong>
+                  <br />
+                  PM2.5: {w.pm25}
+                  <br />
+                  Risk: {w.risk_level}
+                </Popup>
+              </Circle>
+            );
+          })}
         </MapContainer>
 
-        {/* ✅ LEGEND */}
+        {/* LEGEND */}
         <div
           style={{
             position: "absolute",
-            bottom: "20px",
-            left: "20px",
+            bottom: 20,
+            left: 20,
             background: "white",
-            padding: "10px",
-            borderRadius: "6px",
+            padding: 10,
+            borderRadius: 6,
             boxShadow: "0 0 10px rgba(0,0,0,0.3)",
-            fontSize: "14px",
+            fontSize: 14,
           }}
         >
-          <strong>AQI Legend</strong>
-          <div>🟩 Good (≤30)</div>
-          <div>🟨 Moderate (31–60)</div>
-          <div>🟧 Poor (61–90)</div>
-          <div>🟥 Severe (&gt;90)</div>
+          <strong>Air Quality Severity</strong>
+          <div>🟢 Good</div>
+          <div>🟡 Moderate</div>
+          <div>🟠 Poor</div>
+          <div>🔴 Severe</div>
+          <div className="text-xs mt-1">
+            Ring size ∝ PM2.5 concentration
+          </div>
         </div>
       </div>
     </div>

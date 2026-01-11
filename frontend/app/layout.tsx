@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import "leaflet/dist/leaflet.css";
+
 <link
   rel="stylesheet"
   href="https://unpkg.com/leaflet/dist/leaflet.css"

@@ -9,13 +9,20 @@ const LiveMap = dynamic(() => import("../../components/LiveMap"), {
   ssr: false,
 });
 
+type Contributor = {
+  label: string;
+  percent: number;
+};
+
 type AQIResponse = {
   station: string;
   pm25: number;
   risk_level: "Good" | "Moderate" | "Poor" | "Severe";
   precaution: string;
+  contributors?: Contributor[]; // ✅ CORRECT
   data_source: string;
 };
+
 
 type AQIHistoryPoint = {
   time: string;
@@ -42,20 +49,33 @@ export default function Home() {
   const submitComplaint = async () => {
   if (!complaintText.trim()) return;
 
-  await fetch("http://127.0.0.1:5000/api/complaints", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      city,
-      ward,
-      message: complaintText,
-      timestamp: new Date().toISOString(),
-    }),
-  });
+  try {
+    const res = await fetch("http://127.0.0.1:5000/api/complaints", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        city: city,
+        ward: ward,
+        message: complaintText,
+      }),
+    });
 
-  setSubmitted(true);
-  setComplaintText("");
+    if (!res.ok) {
+      throw new Error("Backend error");
+    }
+
+    await res.json();
+
+    setSubmitted(true);
+    setComplaintText("");
+  } catch (error) {
+    console.error("Complaint submission failed:", error);
+    alert("Unable to submit complaint. Please try again.");
+  }
 };
+
 
 
   /* ---------------- CONSTANTS ---------------- */
@@ -115,19 +135,33 @@ export default function Home() {
     setData(await res.json());
   };
 
-  const fetchHistory = async () => {
+ const fetchHistory = async () => {
+  setHistory([]); // ✅ RESET first (VERY IMPORTANT)
+
+  try {
     const res = await fetch(
       `http://127.0.0.1:5000/api/aqi/history/${encodeURIComponent(ward)}`
     );
     if (!res.ok) return;
-    setHistory(await res.json());
-  };
+
+    const data = await res.json();
+    setHistory(data);
+  } catch (err) {
+    console.error("History fetch failed", err);
+  }
+};
+
 
   /* ---------------- EFFECTS ---------------- */
-  useEffect(() => {
-    fetchAQI();
-    fetchHistory();
-  }, [ward, city]);
+  // 🔹 Fetch AQI when city OR ward changes
+useEffect(() => {
+  fetchAQI();
+}, [city, ward]);
+
+// 🔹 Fetch HISTORY only when ward changes
+useEffect(() => {
+  fetchHistory();
+}, [ward]);
 
   useEffect(() => {
     if (data && (data.risk_level === "Poor" || data.risk_level === "Severe")) {
@@ -136,7 +170,6 @@ export default function Home() {
       setShowEmergency(false);
     }
   }, [data]);
-
   /* ---------------- HANDLERS ---------------- */
   const handleMyLocation = () => {
     navigator.geolocation.getCurrentPosition((pos) => {
@@ -154,7 +187,7 @@ export default function Home() {
 
       <main className="min-h-screen bg-white px-6 pb-12 text-gray-900 pt-20">
         {/* MAP */}
-        <section className="h-[420px] rounded-3xl overflow-hidden shadow-xl border mb-10">
+        <section className="h-105* rounded-3xl overflow-hidden shadow-xl border mb-10">
           <LiveMap position={position} />
         </section>
 
@@ -187,14 +220,51 @@ export default function Home() {
             )}
 
             {/* HISTORY CARD */}
-            {history.length > 0 && (
-              <div className="bg-white p-6 rounded-xl shadow border">
-                <h3 className="text-xl font-semibold mb-4">
-                  PM2.5 Trend (Today)
-                </h3>
-                <AQIChart data={history} />
-              </div>
-            )}
+<div className="bg-white p-6 rounded-xl shadow border">
+  <h3 className="text-xl font-semibold mb-4">
+    PM2.5 Trend (Today)
+  </h3>
+
+  {history.length > 0 ? (
+    <AQIChart data={history} />
+  ) : (
+    <p className="text-gray-500 text-sm">
+      No historical data available for this ward.
+    </p>
+  )}
+</div>
+
+
+             {/* SELECT */}
+            <div className="bg-white rounded-xl p-6 shadow border">
+              <h3 className="text-xl font-semibold mb-4">
+                Select City & Area
+              </h3>
+
+              <select
+                value={city}
+                onChange={(e) => {
+                  setCity(e.target.value);
+                  setWard(CITY_WARDS[e.target.value][0]);
+                }}
+                className="w-full p-2 border rounded mb-4"
+              >
+                {Object.keys(CITY_WARDS).map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+
+              <select
+                value={ward}
+                onChange={(e) => setWard(e.target.value)}
+                className="w-full p-2 border rounded"
+              >
+                {CITY_WARDS[city].map((w) => (
+                  <option key={w}>{w}</option>
+                ))}
+              </select>
+            </div>
+          </div>
 
             {/* ACTIONS */}
             {data && (
@@ -209,6 +279,36 @@ export default function Home() {
                 </ul>
               </div>
             )}
+
+             {/* POLLUTION SOURCES */}
+            {data?.contributors && (
+              <div className="bg-white p-6 rounded-xl shadow border">
+                <h3 className="text-xl font-semibold mb-2">
+                  Pollution Sources
+                </h3>
+                <p className="text-sm text-gray-500 mb-4">
+                  Contributing factors in this area
+                </p>
+
+                <div className="space-y-4">
+                  {data.contributors.map((c, i) => (
+                    <div key={i}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span>{c.label}</span>
+                        <span>{c.percent}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className="h-2 rounded-full bg-green-600"
+                          style={{ width: `${c.percent}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* 🚨 COMPLAINT CARD */}
 {data && (data.risk_level === "Poor" || data.risk_level === "Severe") && (
   <div className="bg-red-50 border border-red-200 rounded-xl p-6 shadow">
@@ -240,7 +340,7 @@ export default function Home() {
       </>
     ) : (
       <p className="text-green-700 font-medium">
-        ✅ Complaint submitted successfully (demo).
+        ✅ Complaint submitt  ed successfully (demo).
       </p>
     )}
 
@@ -251,37 +351,6 @@ export default function Home() {
 )}
 
 
-            {/* SELECT */}
-            <div className="bg-white rounded-xl p-6 shadow border">
-              <h3 className="text-xl font-semibold mb-4">
-                Select City & Area
-              </h3>
-
-              <select
-                value={city}
-                onChange={(e) => {
-                  setCity(e.target.value);
-                  setWard(CITY_WARDS[e.target.value][0]);
-                }}
-                className="w-full p-2 border rounded mb-4"
-              >
-                {Object.keys(CITY_WARDS).map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
-
-              <select
-                value={ward}
-                onChange={(e) => setWard(e.target.value)}
-                className="w-full p-2 border rounded"
-              >
-                {CITY_WARDS[city].map((w) => (
-                  <option key={w}>{w}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
           {/* RIGHT COLUMN */}
           <div className="bg-white rounded-2xl p-6 shadow border space-y-4">
             <img src="/growth.gif" className="rounded-xl" />
@@ -289,6 +358,103 @@ export default function Home() {
               🌳 <b>Trees reduce PM2.5</b><br />
               Urban trees can cut pollution by 30%.
             </div>
+            <div
+  style={{
+    position: "relative",
+    height: "110px",
+    overflow: "hidden",
+  }}
+>
+  {/* 🌡️ Natural Cooling */}
+  <div
+    className="eco-card"
+    style={{
+      background: "#ECFEF3",
+      color: "#064e3b",
+      borderRadius: "12px",
+      padding: "1.25rem",
+      fontSize: "0.95rem",
+      border: "1px solid #A7F3D0",
+      position: "absolute",
+      width: "100%",
+      animationDelay: "0s",
+    }}
+  >
+    <b>🌡️ Natural Cooling</b>
+    <div>Shading can lower street temperatures by <b>8°C</b>.</div>
+  </div>
+
+  {/* 🔋 Energy Saver */}
+  <div
+    className="eco-card"
+    style={{
+      background: "#ECFEF3",
+      color: "#064e3b",
+      borderRadius: "12px",
+      padding: "1.25rem",
+      fontSize: "0.95rem",
+      border: "1px solid #A7F3D0",
+      position: "absolute",
+      width: "100%",
+      animationDelay: "3s",
+    }}
+  >
+    <b>🔋 Energy Saver</b>
+    <div>Trees reduce AC usage by <b>30%</b>.</div>
+  </div>
+
+  {/* 💧 Flood Defense */}
+  <div
+    className="eco-card"
+    style={{
+      background: "#ECFEF3",
+      color: "#064e3b",
+      borderRadius: "12px",
+      padding: "1.25rem",
+      fontSize: "0.95rem",
+      border: "1px solid #A7F3D0",
+      position: "absolute",
+      width: "100%",
+      animationDelay: "6s",
+    }}
+  >
+    <b>💧 Flood Defense</b>
+    <div>One tree absorbs <b>15,000L</b> rain/year.</div>
+  </div>
+
+  {/* 🔇 Noise Buffer */}
+  <div
+    className="eco-card"
+    style={{
+      background: "#ECFEF3",
+      color: "#064e3b",
+      borderRadius: "12px",
+      padding: "1.25rem",
+      fontSize: "0.95rem",
+      border: "1px solid #A7F3D0",
+      position: "absolute",
+      width: "100%",
+      animationDelay: "9s",
+    }}
+  >
+    <b>🔇 Noise Buffer</b>
+    <div>Green buffers reduce noise by <b>10 dB</b>.</div>
+  </div>
+</div>
+
+  {/* 🌍 CTA */}
+  <div
+    style={{
+      background: "#F0F9FF",
+      borderRadius: "12px",
+      padding: "0.9rem",
+      fontSize: "0.9rem",
+      color: "#065F46",
+    }}
+  >
+    💡 <b>Did you know?</b><br />
+    Planting trees & reporting pollution can significantly improve local air quality.
+  </div>
           </div>
           {showEmergency && (
   <div

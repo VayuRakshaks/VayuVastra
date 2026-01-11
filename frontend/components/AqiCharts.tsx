@@ -8,6 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
+  ReferenceLine,
 } from "recharts";
 
 type AQIHistoryPoint = {
@@ -22,8 +23,14 @@ export default function AQIChart({ data }: { data: AQIHistoryPoint[] }) {
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="time" />
-          <YAxis />
+          <YAxis domain={[0, "dataMax + 10"]} />
           <Tooltip />
+
+          {/* AQI Thresholds */}
+          <ReferenceLine y={30} stroke="#22c55e" strokeDasharray="3 3" />
+          <ReferenceLine y={60} stroke="#eab308" strokeDasharray="3 3" />
+          <ReferenceLine y={90} stroke="#dc2626" strokeDasharray="3 3" />
+
           <Line
             type="monotone"
             dataKey="pm25"

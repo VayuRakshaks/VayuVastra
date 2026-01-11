@@ -2,15 +2,10 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import json
 import os
+from datetime import datetime
 
 # -------------------------
-# In-memory complaint store (demo)
-# -------------------------
-COMPLAINTS = []
-
-
-# -------------------------
-# CREATE APP (ONCE)
+# CREATE APP
 # -------------------------
 app = Flask(__name__)
 CORS(app)
@@ -22,7 +17,12 @@ from services.auth import auth_bp
 app.register_blueprint(auth_bp, url_prefix="/api/auth")
 
 # -------------------------
-# Mock government sensor data
+# IN-MEMORY STORAGE
+# -------------------------
+COMPLAINTS = []
+
+# -------------------------
+# MOCK SENSOR DATA
 # -------------------------
 MOCK_SENSOR_DATA = {
     "Minto Road (ITO – Civic Centre)": {
@@ -35,27 +35,94 @@ MOCK_SENSOR_DATA = {
     "Lajpat Nagar": {"station": "Lajpat Nagar Central", "pm25": 64},
 }
 
-# Add below MOCK_SENSOR_DATA
-
+# -------------------------
+# AQI TIMESERIES
+# -------------------------
 MOCK_AQI_TIMESERIES = {
     "Rohini": [
-        {"time": "10:00", "pm25": 68},
-        {"time": "11:00", "pm25": 70},
+        {"time": "10:00", "pm25": 65},
+        {"time": "11:00", "pm25": 68},
         {"time": "12:00", "pm25": 72},
         {"time": "13:00", "pm25": 75},
         {"time": "14:00", "pm25": 73},
     ],
     "Minto Road (ITO – Civic Centre)": [
-        {"time": "10:00", "pm25": 80},
-        {"time": "11:00", "pm25": 85},
+        {"time": "10:00", "pm25": 78},
+        {"time": "11:00", "pm25": 82},
         {"time": "12:00", "pm25": 88},
-        {"time": "13:00", "pm25": 90},
-        {"time": "14:00", "pm25": 92},
-    ]
+        {"time": "13:00", "pm25": 91},
+        {"time": "14:00", "pm25": 94},
+    ],
+    "Anand Vihar": [
+        {"time": "10:00", "pm25": 85},
+        {"time": "11:00", "pm25": 88},
+        {"time": "12:00", "pm25": 92},
+        {"time": "13:00", "pm25": 96},
+        {"time": "14:00", "pm25": 99},
+    ],
+    "Lajpat Nagar": [
+        {"time": "10:00", "pm25": 58},
+        {"time": "11:00", "pm25": 61},
+        {"time": "12:00", "pm25": 64},
+        {"time": "13:00", "pm25": 67},
+        {"time": "14:00", "pm25": 65},
+    ],
+    "Dwarka": [
+        {"time": "10:00", "pm25": 45},
+        {"time": "11:00", "pm25": 48},
+        {"time": "12:00", "pm25": 52},
+        {"time": "13:00", "pm25": 55},
+        {"time": "14:00", "pm25": 53},
+    ],
 }
 
 # -------------------------
-# Helpers
+# POLLUTION PROFILE LOGIC
+# -------------------------
+WARD_PROFILES = {
+    "Anand Vihar": ["vehicular", "industrial"],
+    "Minto Road (ITO – Civic Centre)": ["vehicular", "construction"],
+    "Rohini": ["construction", "biomass"],
+    "Dwarka": ["vehicular"],
+    "Lajpat Nagar": ["vehicular", "construction"]
+}
+
+BASE_CONTRIBUTORS = {
+    "vehicular": 30,
+    "industrial": 20,
+    "construction": 15,
+    "biomass": 10,
+    "others": 25
+}
+
+def format_label(key):
+    return {
+        "vehicular": "Vehicular Emissions",
+        "industrial": "Industrial",
+        "construction": "Construction Dust",
+        "biomass": "Biomass & Others",
+        "others": "Others"
+    }[key]
+
+def calculate_contributors(ward, pm25):
+    contributors = BASE_CONTRIBUTORS.copy()
+    dominant = WARD_PROFILES.get(ward, [])
+
+    boost = 10 if pm25 > 90 else 5 if pm25 > 60 else 0
+
+    for src in dominant:
+        contributors[src] += boost
+        contributors["others"] -= boost // max(len(dominant), 1)
+
+    total = sum(contributors.values())
+    return [
+        {"label": format_label(k), "percent": round(v * 100 / total)}
+        for k, v in contributors.items()
+        if v > 0
+    ]
+
+# -------------------------
+# HELPERS
 # -------------------------
 def normalize_name(name):
     return (
@@ -68,94 +135,66 @@ def normalize_name(name):
         .strip()
     )
 
-# -------------------------
-# PM2.5 classification
-# -------------------------
 def classify_pm25(pm25):
     if pm25 <= 30:
-        return "Good", "Air quality is good. Normal outdoor activities are safe."
+        return "Good", "Air quality is good."
     elif pm25 <= 60:
-        return "Moderate", "Sensitive people should reduce prolonged outdoor activity."
+        return "Moderate", "Sensitive people should reduce outdoor activity."
     elif pm25 <= 90:
-        return "Poor", "Avoid outdoor exercise. Wear masks if stepping out."
+        return "Poor", "Avoid outdoor exercise."
     else:
-        return "Severe", "Stay indoors. Avoid outdoor exposure."
+        return "Severe", "Stay indoors. Avoid exposure."
 
 # -------------------------
-# Root route
+# ROOT
 # -------------------------
 @app.route("/")
 def home():
-    return jsonify({
-        "service": "VayuVastra Backend",
-        "mode": "mock-data",
-        "status": "running"
-    })
+    return jsonify({"service": "VayuVastra Backend", "status": "running"})
 
-# =====================================================
-# GOVERNMENT DASHBOARD APIS
-# =====================================================
-
+# -------------------------
+# WARDS
+# -------------------------
 @app.route("/api/wards")
 def get_all_wards():
-    wards = []
-
+    result = []
     for ward, data in MOCK_SENSOR_DATA.items():
-        pm25 = data["pm25"]
-        level, _ = classify_pm25(pm25)
-
-        wards.append({
+        level, _ = classify_pm25(data["pm25"])
+        result.append({
             "ward": ward,
             "station": data["station"],
-            "pm25": pm25,
+            "pm25": data["pm25"],
             "risk_level": level
         })
-
-    return jsonify(wards)
+    return jsonify(result)
 
 @app.route("/api/wards/high-risk")
 def get_high_risk_wards():
-    high_risk = []
+    return jsonify([
+        w for w in get_all_wards().json
+        if w["risk_level"] in ["Poor", "Severe"]
+    ])
 
-    for ward, data in MOCK_SENSOR_DATA.items():
-        pm25 = data["pm25"]
-        level, _ = classify_pm25(pm25)
-
-        if level in ["Poor", "Severe"]:
-            high_risk.append({
-                "ward": ward,
-                "station": data["station"],
-                "pm25": pm25,
-                "risk_level": level
-            })
-
-    return jsonify(high_risk)
-
+# -------------------------
+# GEOJSON
+# -------------------------
 @app.route("/api/wards/geojson")
 def get_ward_geojson():
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    geojson_path = os.path.join(base_dir, "data", "ward.geojson")
+    path = os.path.join(os.path.dirname(__file__), "data", "ward.geojson")
+    if not os.path.exists(path):
+        return jsonify({"type": "FeatureCollection", "features": []})
+    with open(path, "r", encoding="utf-8") as f:
+        return jsonify(json.load(f))
 
-    if not os.path.exists(geojson_path):
-        return jsonify({
-            "type": "FeatureCollection",
-            "features": []
-        })
-
-    with open(geojson_path, "r", encoding="utf-8") as f:
-        geojson_data = json.load(f)
-
-    return jsonify(geojson_data)
-
-# =====================================================
-# CITIZEN / WARD DETAIL API
-# =====================================================
+# -------------------------
+# AQI (FINAL SINGLE ROUTE)
+# -------------------------
 @app.route("/api/aqi/<city>/<ward>")
 def get_aqi(city, ward):
-    ward = normalize_name(ward)
+    normalized = normalize_name(ward)
 
     for key, data in MOCK_SENSOR_DATA.items():
-        if normalize_name(key) == ward:
+        if normalize_name(key) == normalized:
             pm25 = data["pm25"]
             level, advice = classify_pm25(pm25)
 
@@ -165,97 +204,29 @@ def get_aqi(city, ward):
                 "pm25": pm25,
                 "risk_level": level,
                 "precaution": advice,
+                "contributors": calculate_contributors(key, pm25),
                 "data_source": "Mock CPCB Sensor (Demo Mode)"
             })
 
-    return jsonify({
-        "city": city,
-        "station": ward,
-        "pm25": 55,
-        "risk_level": "Moderate",
-        "precaution": "Fallback demo data",
-        "data_source": "Mock Fallback"
-    })
+    return jsonify({"error": "Ward not found"}), 404
+
+# -------------------------
+# AQI HISTORY
+# -------------------------
 @app.route("/api/aqi/history/<ward>")
-def get_aqi_history(ward):
+def get_history(ward):
     ward = normalize_name(ward)
-
-    for key, history in MOCK_AQI_TIMESERIES.items():
+    for key, data in MOCK_AQI_TIMESERIES.items():
         if normalize_name(key) == ward:
-            return jsonify(history)
-
+            return jsonify(data)
     return jsonify([])
 
-
 # -------------------------
-# Mock complaints storage
+# COMPLAINTS
 # -------------------------
-COMPLAINTS = []
-
 @app.route("/api/complaints", methods=["POST"])
 def submit_complaint():
     data = request.json
-
-    required_fields = ["city", "ward", "issue"]
-    if not all(field in data for field in required_fields):
-        return jsonify({"error": "Missing required fields"}), 400
-
-    complaint = {
-        "id": len(COMPLAINTS) + 1,
-        "city": data["city"],
-        "ward": data["ward"],
-        "issue": data["issue"],
-        "timestamp": data.get("timestamp"),
-        "status": "Pending"
-    }
-
-    COMPLAINTS.append(complaint)
-
-    return jsonify({
-        "message": "Complaint submitted successfully",
-        "complaint_id": complaint["id"]
-    }), 201
-
-
-# =====================================================
-# 🛑 COMPLAINTS (IN-MEMORY)
-# =====================================================
-
-complaints = []
-
-@app.route("/api/complaints", methods=["POST"])
-def submit_complaint():
-    data = request.json
-
-    complaint = {
-        "city": data.get("city"),
-        "ward": data.get("ward"),
-        "message": data.get("message"),
-        "timestamp": data.get("timestamp"),
-        "status": "Pending"
-    }
-
-    complaints.append(complaint)
-
-    return jsonify({
-        "success": True,
-        "message": "Complaint registered successfully"
-    }), 201
-
-
-@app.route("/api/complaints", methods=["GET"])
-def get_complaints():
-    return jsonify(complaints)
-
-from datetime import datetime
-
-@app.route("/api/complaints", methods=["POST"])
-def submit_complaint():
-    data = request.json
-
-    if not data:
-        return jsonify({"error": "Invalid data"}), 400
-
     complaint = {
         "id": len(COMPLAINTS) + 1,
         "city": data.get("city"),
@@ -264,31 +235,18 @@ def submit_complaint():
         "time": datetime.now().isoformat(),
         "status": "Open"
     }
-
     COMPLAINTS.append(complaint)
-
-    return jsonify({
-        "success": True,
-        "complaint": complaint
-    }), 201
+    return jsonify({"success": True, "complaint": complaint}), 201
 
 @app.route("/api/complaints", methods=["GET"])
 def get_complaints():
     ward = request.args.get("ward")
-
     if ward:
-        filtered = [
-            c for c in COMPLAINTS
-            if c["ward"].lower() == ward.lower()
-        ]
-        return jsonify(filtered)
-
+        return jsonify([c for c in COMPLAINTS if c["ward"] == ward])
     return jsonify(COMPLAINTS)
 
-
-
 # -------------------------
-# Run app
+# RUN
 # -------------------------
 if __name__ == "__main__":
     app.run(debug=True, use_reloader=False)
