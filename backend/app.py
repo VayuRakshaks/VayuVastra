@@ -3,6 +3,10 @@ from flask_cors import CORS
 import json
 import os
 from datetime import datetime
+from werkzeug.utils import secure_filename
+
+UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # -------------------------
 # CREATE APP
@@ -226,23 +230,43 @@ def get_history(ward):
 # -------------------------
 @app.route("/api/complaints", methods=["POST"])
 def submit_complaint():
-    data = request.json
+    
+    message = request.form.get("message")
+    city = request.form.get("city")
+    ward = request.form.get("ward")
+
+    file = request.files.get("media")
+    filename = None
+
+    if file:
+        filename = secure_filename(file.filename)
+        file.save(os.path.join(UPLOAD_FOLDER, filename))
+
     complaint = {
         "id": len(COMPLAINTS) + 1,
-        "city": data.get("city"),
-        "ward": data.get("ward"),
-        "message": data.get("message"),
+        "city": city,
+        "ward": ward,
+        "message": message,
+        "media": filename,
         "time": datetime.now().isoformat(),
         "status": "Open"
     }
+
     COMPLAINTS.append(complaint)
+
     return jsonify({"success": True, "complaint": complaint}), 201
 
 @app.route("/api/complaints", methods=["GET"])
 def get_complaints():
     ward = request.args.get("ward")
+
     if ward:
-        return jsonify([c for c in COMPLAINTS if c["ward"] == ward])
+        ward = ward.strip().lower()
+        return jsonify([
+            c for c in COMPLAINTS
+            if c["ward"] and c["ward"].strip().lower() == ward
+        ])
+
     return jsonify(COMPLAINTS)
 
 # -------------------------
