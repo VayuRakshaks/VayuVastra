@@ -69,7 +69,7 @@ const filteredComplaints =
   <select
     value={selectedWard}
     onChange={(e) => setSelectedWard(e.target.value)}
-    className="border rounded px-3 py-1"
+    className="border rounded px-3 text-grey-700 py-1"
   >
     {wards.map((w) => (
       <option key={w} value={w}>
@@ -98,9 +98,9 @@ const filteredComplaints =
                     key={i}
                     className="border-t hover:bg-gray-50 transition"
                   >
-                    <td className="p-3">{c.city}</td>
-                    <td className="p-3 font-medium">{c.ward}</td>
-                    <td className="p-3">{c.message}</td>
+                    <td className="p-3  text-gray-600" >{c.city}</td>
+                    <td className="p-3  text-gray-600 font-medium">{c.ward}</td>
+                    <td className="p-3 text-gray-600 ">{c.message}</td>
                     <td className="p-3 text-gray-600">
                       {new Date(c.timestamp).toLocaleString()}
                     </td>
