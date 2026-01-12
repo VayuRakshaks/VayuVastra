@@ -3,8 +3,27 @@ from flask_cors import CORS
 import json
 import os
 from datetime import datetime
- 
- 
+
+# -------------------------
+# NORMALIZATION
+# -------------------------
+def normalize_ward(name):
+    if not name:
+        return ""
+    return (
+        name.lower()
+        .replace("–", "-")
+        .replace("—", "-")
+        .replace("(", "")
+        .replace(")", "")
+        .replace("/", "")
+        .replace("  ", " ")
+        .strip()
+    )
+
+def normalize_name(name):
+    return normalize_ward(name)
+
 # -------------------------
 # CREATE APP
 # -------------------------
@@ -78,7 +97,7 @@ MOCK_AQI_TIMESERIES = {
 }
 
 # -------------------------
-# POLLUTION PROFILE LOGIC
+# POLLUTION CONTRIBUTORS
 # -------------------------
 WARD_PROFILES = {
     "Anand Vihar": ["vehicular", "industrial"],
@@ -123,19 +142,8 @@ def calculate_contributors(ward, pm25):
     ]
 
 # -------------------------
-# HELPERS
+# AQI CLASSIFICATION
 # -------------------------
-def normalize_name(name):
-    return (
-        name.lower()
-        .replace("–", "-")
-        .replace("—", "-")
-        .replace("(", "")
-        .replace(")", "")
-        .replace("/", "")
-        .strip()
-    )
-
 def classify_pm25(pm25):
     if pm25 <= 30:
         return "Good", "Air quality is good."
@@ -188,14 +196,14 @@ def get_ward_geojson():
         return jsonify(json.load(f))
 
 # -------------------------
-# AQI (FINAL SINGLE ROUTE)
+# AQI
 # -------------------------
 @app.route("/api/aqi/<city>/<ward>")
 def get_aqi(city, ward):
-    normalized = normalize_name(ward)
+    ward_key = normalize_ward(ward)
 
     for key, data in MOCK_SENSOR_DATA.items():
-        if normalize_name(key) == normalized:
+        if normalize_ward(key) == ward_key:
             pm25 = data["pm25"]
             level, advice = classify_pm25(pm25)
 
@@ -216,52 +224,51 @@ def get_aqi(city, ward):
 # -------------------------
 @app.route("/api/aqi/history/<ward>")
 def get_history(ward):
-    ward = normalize_name(ward)
+    ward_key = normalize_ward(ward)
     for key, data in MOCK_AQI_TIMESERIES.items():
-        if normalize_name(key) == ward:
+        if normalize_ward(key) == ward_key:
             return jsonify(data)
     return jsonify([])
 
 # -------------------------
-# COMPLAINTS
+# COMPLAINTS (POST)
 # -------------------------
 @app.route("/api/complaints", methods=["POST"])
 def submit_complaint():
-    
-    message = request.form.get("message")
-    city = request.form.get("city")
-    ward = request.form.get("ward")
+    data = request.get_json(silent=True) or {}
 
-    file = request.files.get("media")
-    filename = None
+    message = data.get("message")
+    city = data.get("city")
+    ward = data.get("ward")
 
-    if file:
-        filename = secure_filename(file.filename)
-        file.save(os.path.join(UPLOAD_FOLDER, filename))
+    if not message or not city or not ward:
+        return jsonify({"error": "Missing required fields"}), 400
 
     complaint = {
         "id": len(COMPLAINTS) + 1,
         "city": city,
         "ward": ward,
+        "ward_key": normalize_ward(ward),
         "message": message,
-        "media": filename,
         "time": datetime.now().isoformat(),
         "status": "Open"
     }
 
     COMPLAINTS.append(complaint)
-
     return jsonify({"success": True, "complaint": complaint}), 201
 
+# -------------------------
+# COMPLAINTS (GET)
+# -------------------------
 @app.route("/api/complaints", methods=["GET"])
 def get_complaints():
     ward = request.args.get("ward")
 
     if ward:
-        ward = ward.strip().lower()
+        ward_key = normalize_ward(ward)
         return jsonify([
             c for c in COMPLAINTS
-            if c["ward"] and c["ward"].strip().lower() == ward
+            if c["ward_key"] == ward_key
         ])
 
     return jsonify(COMPLAINTS)
